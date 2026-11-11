@@ -150,3 +150,19 @@ h2 { font-size: 17px; margin: 18px 2px 8px; }
   opacity: 0; pointer-events: none; transition: opacity .2s; max-width: 90vw; z-index: 60;
 }
 #toast.on { opacity: 1; }
+
+/* ❓ 說明（v0.1.1）：內容由 help.js 產生 */
+.help-tabs { position: sticky; top: calc(46px + env(safe-area-inset-top, 0px)); z-index: 10; background: var(--bg); padding: 12px 0 8px; }
+.help { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 4px 16px 16px; margin-top: 4px; line-height: 1.75; overflow-wrap: anywhere; }
+.help h1 { font-size: 20px; color: var(--sky-dark); margin: 14px 0 6px; }
+.help h2 { font-size: 17px; color: var(--sky-dark); border-bottom: 1px solid var(--line); padding-bottom: 4px; margin: 22px 0 8px; }
+.help h3 { font-size: 15.5px; margin: 16px 0 4px; }
+.help ul, .help ol { padding-left: 1.3em; margin: 6px 0; }
+.help blockquote { margin: 10px 0; padding: 6px 12px; background: var(--sky-soft); border-left: 4px solid var(--sky); border-radius: 0 8px 8px 0; color: var(--ink); }
+.help blockquote p { margin: 4px 0; }
+.help table { border-collapse: collapse; width: 100%; font-size: 14px; display: block; overflow-x: auto; }
+.help th, .help td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+.help th { background: var(--sky-soft); }
+.help pre { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; overflow-x: auto; font-size: 12px; line-height: 1.45; }
+.help code { background: var(--sky-soft); border-radius: 4px; padding: 0 4px; font-size: .88em; }
+.help pre code { background: none; padding: 0; }

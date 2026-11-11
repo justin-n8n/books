@@ -2,7 +2,7 @@
    資料：03 正本 xlsx → 04 的「產生App資料.py」寫進 04/06.App資料/小輝給App/書單.json 的 shelf、ext
         → 借用 04「愈讀樂讀-同步」Apps Script 的 meta/books 讀回來（網址與密語跟 04 App 一樣）。
    只能看、不能改；書單有變只改 03 的 xlsx。 */
-const APP_VERSION = 'v0.1.0';
+const APP_VERSION = 'v0.1.1';
 const $ = s => document.querySelector(s);
 const view = $('#view');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -83,7 +83,7 @@ function bookRow(b, q) {
     <div class="m">${b.a ? `<span>${hl(b.a, q)}</span>` : ''}${cat}<span>${esc(SRC_NAME(b.s))}</span>${b.d ? `<span>🆕 ${esc(b.d.slice(5).replace('-', '/'))}</span>` : ''}</div></button>`;
 }
 function setupNotice() {
-  return `<div class="notice">👋 第一次使用：到 <a href="#settings">⚙️ 設定</a> 填<b>寫心得 App（愈讀樂讀）</b>的雲端網址和密語，按「儲存並更新書單」就會把 ${'03'} 書單抓下來。之後沒有網路也能查。</div>`;
+  return `<div class="notice">👋 第一次使用：到 <a href="#settings">⚙️ 設定</a> 填<b>寫心得 App（愈讀樂讀）</b>的雲端網址和密語，按「儲存並更新書單」就會把 03 書單抓下來。之後沒有網路也能查。<br><small>怎麼用、怎麼加書，看下面的 <a href="#help" data-h="use">❓ 說明</a>。</small></div>`;
 }
 async function renderFind() {
   const total = shelf.length;
@@ -164,7 +164,7 @@ async function renderSettings() {
       <div class="small">上次更新：${fetchedAt ? new Date(fetchedAt).toLocaleString('zh-TW', { hour12: false }) : '—'}；每 6 小時自動更新一次</div>
       <div class="row"><button class="sub" id="now">立刻更新書單</button></div>
     </div>
-    <p class="small">版本 ${APP_VERSION}。這個 App 只能看；要加書、改分類，跟小輝說「幫我加書」。<br>
+    <p class="small">版本 ${APP_VERSION}。這個 App 只能看；要加書、改分類，看 <a href="#help" data-h="add">❓ 說明 → 加書</a>。<br>
     同一個網址底下還有修行、英文、日記、寫心得 App：<b>不要清除這個網站的資料</b>，會連它們一起清掉。</p>`;
   const go = async () => {
     try { toast('更新中…'); await refresh(true); toast(`書單更新好了：${shelf.length.toLocaleString()} 本`); renderSettings(); }
@@ -178,6 +178,18 @@ async function renderSettings() {
   });
   $('#now').addEventListener('click', go);
 }
+
+/* ---------------- ❓ 說明（內容在 help.js，由 03 號 文件說明 的 .md 產生，不要手改 help.js） ---------------- */
+const HELP_TABS = [['use', '📱 怎麼用'], ['add', '➕ 加書'], ['maint', '🔧 維護']];
+async function renderHelp() {
+  const which = (await kvGet('helpTab')) || 'use';
+  const has = typeof HELP === 'object';
+  view.innerHTML = `<div class="chips help-tabs">${HELP_TABS.map(([k, n]) => `<button class="chip ${k === which ? 'on' : ''}" data-h="${k}">${n}</button>`).join('')}</div>
+    <div class="help">${has ? HELP[which] : '<p>說明還沒載入，連上網路再打開一次。</p>'}</div>`;
+  view.querySelectorAll('[data-h]').forEach(b => b.onclick = async () => { await kvSet('helpTab', b.dataset.h); renderHelp(); window.scrollTo(0, 0); });
+}
+// 其他頁的「❓ 說明 → 加書」連結：先記要開哪一頁
+document.addEventListener('click', async e => { const a = e.target.closest('a[href="#help"][data-h]'); if (a) await kvSet('helpTab', a.dataset.h); }, true);
 
 /* ---------------- 書的詳細 ---------------- */
 function openBook(b) {
@@ -211,11 +223,12 @@ async function route() {
   let h = location.hash || '#find';
   if (h === '#book') return;
   if (!$('#sheet').hidden) $('#sheet').hidden = true;
-  if (!['#find', '#new', '#stats', '#settings'].includes(h)) h = '#find';
+  if (!['#find', '#new', '#stats', '#help', '#settings'].includes(h)) h = '#find';
   document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', a.getAttribute('href') === h));
   if (h === '#find') await renderFind();
   else if (h === '#new') renderNew();
   else if (h === '#stats') renderStats();
+  else if (h === '#help') await renderHelp();
   else await renderSettings();
   if (h !== lastTab) window.scrollTo(0, 0);
   lastTab = h;

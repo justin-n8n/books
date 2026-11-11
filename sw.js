@@ -1,7 +1,7 @@
 /* 離線快取。新增檔案時加進 FILES，並把 VERSION 加一（app.js 的 APP_VERSION、index.html 的 ?v= 也要一起改）。
    同網域還有 04、34、43、47：只刪自己開頭（books-）的快取。 */
-const VERSION = 'books-v0.1.0';
-const FILES = ['./', 'index.html', 'style.css?v=0.1.0', 'app.js?v=0.1.0', 'db.js?v=0.1.0', 'manifest.webmanifest',
+const VERSION = 'books-v0.1.1';
+const FILES = ['./', 'index.html', 'style.css?v=0.1.1', 'app.js?v=0.1.1', 'db.js?v=0.1.1', 'help.js?v=0.1.1', 'manifest.webmanifest',
   'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'ahui-study.webp'];
 
 self.addEventListener('install', e => {
