@@ -3,7 +3,7 @@
         → 借用 04「愈讀樂讀-同步」Apps Script 的 meta/books 讀回來（網址與密語跟 04 App 一樣）。
    只能看、不能改；書單有變只改 03 的 xlsx。
    v0.2.0（11/12）：「🎙️ 歐陽讀書會」分頁＝08 的 books.json＋notes.json，由同一支 產生App資料.py 放進書單.json 的 club。 */
-const APP_VERSION = 'v0.2.0';
+const APP_VERSION = 'v0.2.1';   // v0.2.1（11/12）：底部分頁名改回 Justin Q10 選的「歐陽讀書會」
 const $ = s => document.querySelector(s);
 const view = $('#view');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
