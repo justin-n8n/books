@@ -1,8 +1,9 @@
 /* 阿輝的書房 — 03 書單的手機 App（2026-11-11 起）
    資料：03 正本 xlsx → 04 的「產生App資料.py」寫進 04/06.App資料/小輝給App/書單.json 的 shelf、ext
         → 借用 04「愈讀樂讀-同步」Apps Script 的 meta/books 讀回來（網址與密語跟 04 App 一樣）。
-   只能看、不能改；書單有變只改 03 的 xlsx。 */
-const APP_VERSION = 'v0.1.1';
+   只能看、不能改；書單有變只改 03 的 xlsx。
+   v0.2.0（11/12）：「🎙️ 歐陽讀書會」分頁＝08 的 books.json＋notes.json，由同一支 產生App資料.py 放進書單.json 的 club。 */
+const APP_VERSION = 'v0.2.0';
 const $ = s => document.querySelector(s);
 const view = $('#view');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -15,6 +16,7 @@ const SRC_NAME = s => ({ 'Kobo購買書單': 'Kobo 購買', '中華電信_網路
 
 /* ---------------- 資料 ---------------- */
 let shelf = [], ext = {}, byTitle = new Map(), dataSrc = '', fetchedAt = 0;
+let club = { books: [], synced: '' };   // v0.2.0：08 歐陽讀書會（書單.json 的 club）
 function index() {
   byTitle = new Map(shelf.map(b => [b.t, b]));
   for (const b of shelf) b._k = norm(b.t + ' ' + (b.a || '') + ' ' + (b.f || ''));   // 法鼓書系名也搜得到
@@ -22,6 +24,8 @@ function index() {
 async function loadLocal() {
   const d = await kvGet('books');
   shelf = d?.shelf || []; ext = d?.ext || {}; dataSrc = d?.src || '';
+  club = d?.club?.books ? d.club : { books: [], synced: '' };
+  for (const c of club.books) c._k = norm([c.t, ...c.q, ...Object.values(c.note || {}).flat()].join(' '));
   fetchedAt = (await kvGet('fetchedAt')) || 0;
   index();
 }
@@ -48,7 +52,7 @@ async function refresh(force) {
   if (!force && Date.now() - fetchedAt < 6 * 3600e3) return false;
   const r = await api('meta', { what: 'books' });
   if (!r.data?.shelf) throw new Error('雲端書單還沒有完整資料（請小輝重跑產生App資料.py）');
-  await kvSet('books', { src: r.data.src, shelf: r.data.shelf, ext: r.data.ext || {} });
+  await kvSet('books', { src: r.data.src, shelf: r.data.shelf, ext: r.data.ext || {}, club: r.data.club || null });
   await kvSet('fetchedAt', Date.now());
   await loadLocal();
   return true;
@@ -150,6 +154,77 @@ function renderStats() {
     location.hash = '#find';
   }));
 }
+/* ---------------- 🎙️ 歐陽讀書會（v0.2.0） ---------------- */
+const SEASON_ICON = n => ({ 5: '5️⃣', 6: '6️⃣', 7: '7️⃣', 8: '8️⃣', 9: '9️⃣', 10: '🔟', 11: '1️⃣1️⃣', 12: '1️⃣2️⃣', 13: '1️⃣3️⃣' }[n] || '🎙️');
+const thumb = (c, size = 'mqdefault') => c.y ? `https://i.ytimg.com/vi/${encodeURIComponent(c.y)}/${size}.jpg` : '';
+const NOTE_PART = [['quote', '💎 金句摘錄'], ['mine', '🧠 我的理解'], ['act', '🎯 行動方案'], ['review', '🔄 之後回看']];
+const hasNote = c => c.note && Object.keys(c.note).length > 0;
+const cstate = { q: '', season: '全部' };
+function clubRow(c, i, q) {
+  const img = thumb(c);
+  return `<button class="club" data-i="${i}">
+    ${img ? `<img src="${img}" alt="" loading="lazy">` : '<div class="noimg">🎙️</div>'}
+    <div><div class="t">${hl(c.t, q)}</div>
+    <div class="m"><span>${esc(c.d.replace(/-/g, '/'))}</span>${c.o ? '<span class="tag">📗 書單有</span>' : ''}${hasNote(c) ? '<span class="tag note">📝 有筆記</span>' : ''}${c.y ? '' : '<span>影片已下架</span>'}</div></div></button>`;
+}
+function renderClub() {
+  if (!shelf.length) { view.innerHTML = setupNotice(); return; }
+  const all = club.books;
+  if (!all.length) {
+    view.innerHTML = `<h2>🎙️ 歐陽讀書會</h2><div class="notice">雲端書單裡還沒有讀書會資料。到 ⚙️ 設定按「立刻更新書單」；還是沒有，請小輝在筆電說「<b>同步讀書會筆記</b>」。</div>`;
+    return;
+  }
+  const latest = all[0];
+  const seasons = [...new Map(all.map(c => [c.s, c.n])).entries()].sort((a, b) => b[1] - a[1]);
+  view.innerHTML = `
+    <button class="latest" data-i="0">
+      ${thumb(latest, 'hqdefault') ? `<img src="${thumb(latest, 'hqdefault')}" alt="">` : '<div class="noimg big">🎙️</div>'}
+      <div class="cap"><small>🎙️ 最新一場｜${esc(latest.s)}・${esc(latest.d.replace(/-/g, '/'))}</small><b>${esc(latest.t)}</b></div></button>
+    <div class="searchbar"><input id="cq" type="search" placeholder="🔍 書名、關鍵問題、我的筆記" value="${esc(cstate.q)}" autocomplete="off" enterkeyhint="search">
+      <button class="clear" id="cclr" aria-label="清除" ${cstate.q ? '' : 'hidden'}>✕</button></div>
+    <div class="chips" id="seasons">${[['全部', 0], ...seasons].map(([s, n]) => `<button class="chip ${cstate.season === s ? 'on' : ''}" data-s="${esc(s)}">${s === '全部' ? `全部 ${all.length} 場` : SEASON_ICON(n) + ' ' + esc(s)}</button>`).join('')}</div>
+    <div class="count" id="ccnt"></div><div id="clist"></div>`;
+  // 打字時只重畫清單，不重畫搜尋框（手機注音輸入選字中重畫會打斷）
+  const draw = () => {
+    const words = cstate.q.trim().split(/\s+/).map(norm).filter(Boolean);
+    const rows = all.map((c, i) => [c, i]).filter(([c]) => (cstate.season === '全部' || c.s === cstate.season) && words.every(w => c._k.includes(w)));
+    const groups = [];
+    for (const [c, i] of rows) { let g = groups.find(x => x.s === c.s); if (!g) groups.push(g = { s: c.s, n: c.n, items: [] }); g.items.push([c, i]); }
+    $('#ccnt').textContent = `${cstate.q ? `找到 ${rows.length} 場` : `${rows.length} 場`}｜📗 書單有 ${all.filter(c => c.o).length} 本・📝 有筆記 ${all.filter(hasNote).length} 本`;
+    $('#clist').innerHTML = groups.length ? groups.map(g => `<div class="day">${SEASON_ICON(g.n)} ${esc(g.s)}（${g.items.length} 場）</div><div class="list">${g.items.map(([c, i]) => clubRow(c, i, cstate.q)).join('')}</div>`).join('')
+      : `<div class="empty">📭 讀書會裡沒有「${esc(cstate.q)}」<br><small>試試少打幾個字${cstate.season !== '全部' ? '，或選「全部」季' : ''}</small></div>`;
+  };
+  draw();
+  const q = $('#cq');
+  q.addEventListener('input', () => { cstate.q = q.value; $('#cclr').hidden = !q.value; draw(); });
+  q.addEventListener('keydown', e => { if (e.key === 'Enter') q.blur(); });
+  $('#cclr').addEventListener('click', () => { cstate.q = ''; q.value = ''; $('#cclr').hidden = true; draw(); q.focus(); });
+  $('#seasons').addEventListener('click', e => { const c = e.target.closest('[data-s]'); if (!c) return; cstate.season = c.dataset.s; renderClub(); });
+}
+function openClub(c) {
+  const img = thumb(c, 'hqdefault');
+  const ans = c.note?.ans || [];
+  const parts = NOTE_PART.filter(([k]) => c.note?.[k]);
+  const own = c.o ? shelf.find(x => x.o === c.o) : null;
+  $('#sheet .sheet-card').innerHTML = `<div class="grip"></div>
+    ${img ? `<a class="vthumb" href="https://www.youtube.com/watch?v=${encodeURIComponent(c.y)}" target="_blank" rel="noopener"><img src="${img}" alt="看直播回放"><span>▶</span></a>` : ''}
+    <h3>${esc(c.t)}</h3><div class="au">${esc(c.s)}・${esc(c.d.replace(/-/g, '/'))}${c.w ? `（${esc(c.w)}）` : ''}</div>
+    <div class="small">🤔 三個關鍵問題（先想一想，再看影片）</div>
+    <ol class="qs">${c.q.map((x, i) => `<li><b>${esc(x)}</b>${ans[i] ? `<div class="ans">${esc(ans[i])}</div>` : ''}</li>`).join('')}</ol>
+    <div class="small">📝 我的讀書筆記</div>
+    ${parts.length ? parts.map(([k, n]) => `<div class="npart"><b>${n}</b><div>${esc(c.note[k])}</div></div>`).join('')
+      : `<div class="nonote">還沒寫。在筆電的 Notion 寫好後，跟小輝說「同步讀書會筆記」，這裡就看得到。</div>`}
+    ${own ? `<button class="own" data-o="${own.o}">📗 書單裡有這本：${esc(own.t)} ›</button>` : ''}
+    <div class="btns">${c.y ? `<a class="btn main" href="https://www.youtube.com/watch?v=${encodeURIComponent(c.y)}" target="_blank" rel="noopener">▶️ 看影片</a>` : '<span class="btn sub off">影片已下架</span>'}
+      ${c.p ? `<a class="btn sub" href="https://www.notion.so/${encodeURIComponent(c.p)}" target="_blank" rel="noopener">開 Notion ↗</a>` : ''}</div>
+    <div class="btns" style="margin-top:10px"><button class="btn sub" id="close">關閉</button></div>`;
+  $('#sheet').hidden = false;
+  $('#sheet .sheet-card').scrollTop = 0;
+  $('#close').addEventListener('click', closeBook);
+  $('#sheet .own')?.addEventListener('click', e => openBook(shelf.find(x => x.o === +e.currentTarget.dataset.o)));
+  if (location.hash !== '#book') history.pushState({ book: 1 }, '', '#book');
+}
+
 async function renderSettings() {
   const cfg = (await kvGet('cfg')) || {};
   view.innerHTML = `<h2>⚙️ 設定</h2>
@@ -161,6 +236,7 @@ async function renderSettings() {
     </div>
     <div class="form">
       <div>書單：${shelf.length ? `${shelf.length.toLocaleString()} 本（${esc(dataSrc)}）` : '還沒抓'}</div>
+      <div class="small">🎙️ 歐陽讀書會：${club.books.length ? `${club.books.length} 場${club.synced ? `；筆記同步到 ${esc(club.synced)}` : ''}` : '還沒有'}</div>
       <div class="small">上次更新：${fetchedAt ? new Date(fetchedAt).toLocaleString('zh-TW', { hour12: false }) : '—'}；每 6 小時自動更新一次</div>
       <div class="row"><button class="sub" id="now">立刻更新書單</button></div>
     </div>
@@ -215,7 +291,12 @@ function openBook(b) {
 }
 function closeBook() { if (!$('#sheet').hidden) { $('#sheet').hidden = true; if (location.hash === '#book') history.back(); } }
 $('#sheet .sheet-bg').addEventListener('click', closeBook);
-view.addEventListener('click', e => { const el = e.target.closest('.book[data-o]'); if (el) openBook(shelf.find(x => x.o === +el.dataset.o)); });
+view.addEventListener('click', e => {
+  const el = e.target.closest('.book[data-o]');
+  if (el) return openBook(shelf.find(x => x.o === +el.dataset.o));
+  const c = e.target.closest('.club[data-i], .latest[data-i]');
+  if (c) openClub(club.books[+c.dataset.i]);
+});
 
 /* ---------------- 換頁 ---------------- */
 let lastTab = '#find';
@@ -223,10 +304,11 @@ async function route() {
   let h = location.hash || '#find';
   if (h === '#book') return;
   if (!$('#sheet').hidden) $('#sheet').hidden = true;
-  if (!['#find', '#new', '#stats', '#help', '#settings'].includes(h)) h = '#find';
+  if (!['#find', '#new', '#club', '#stats', '#help', '#settings'].includes(h)) h = '#find';
   document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', a.getAttribute('href') === h));
   if (h === '#find') await renderFind();
   else if (h === '#new') renderNew();
+  else if (h === '#club') renderClub();
   else if (h === '#stats') renderStats();
   else if (h === '#help') await renderHelp();
   else await renderSettings();
@@ -239,7 +321,8 @@ window.addEventListener('popstate', () => { if (location.hash !== '#book' && !$(
 (async () => {
   await loadLocal();
   await route();
-  try { if (await refresh(false) && ['#find', '#new', '#stats', ''].includes(location.hash)) route(); }
+  // v0.2.0：舊版存的書單沒有讀書會，第一次打開就馬上抓，不用等 6 小時
+  try { if (await refresh(shelf.length > 0 && !club.books.length) &&['#find', '#new', '#club', '#stats', ''].includes(location.hash)) route(); }
   catch (e) { if (shelf.length) toast('書單沒更新（' + e.message + '），先用手機裡的'); }
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
